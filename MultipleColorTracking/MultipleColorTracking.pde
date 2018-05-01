@@ -6,6 +6,8 @@
  * https://github.com/atduskgreg/opencv-processing
  *
  * @author: Jordi Tost (@jorditost)
+ * @author: Joey van der Bie (@joeyvanderbie)
+ * @author: Danica Mast (@danicamast)
  * @url: https://github.com/jorditost/ImageFiltering/tree/master/MultipleColorTracking
  *
  * University of Applied Sciences Potsdam, 2014
@@ -13,7 +15,7 @@
  * Instructions:
  * Press one numerical key [1-4] and click on one color to track it
  */
- 
+
 import gab.opencv.*;
 import processing.video.*;
 import java.awt.Rectangle;
@@ -23,13 +25,13 @@ import java.awt.Rectangle;
 static int CAPTURE   = 1;
 static int VIDEO     = 2;
 //static int KINECT    = 3;
-int source = VIDEO;
+int source = CAPTURE;
 
 OpenCV opencv;
 Capture cam;
 Movie video;
 PImage src;
-ArrayList<Contour> contours;
+ArrayList<ArrayList> contours;
 
 // <1> Set the range of Hue values for our filter
 //ArrayList<Integer> colors;
@@ -43,92 +45,92 @@ PImage[] outputs;
 int colorToChange = -1;
 
 void setup() {
-  
+
   // CAPTURE
   if (source == CAPTURE) {
     cam = new Capture(this, 640, 480);
     cam.start();
     opencv = new OpenCV(this, cam.width, cam.height);
-    
-  // VIDEO
+
+    // VIDEO
   } else if (source == VIDEO) {
     video = new Movie(this, "slime1.mov");
     video.loop();
     video.play();
-    opencv = new OpenCV(this, 640, 480); 
+    opencv = new OpenCV(this, 640, 480);
   }
-  
-  contours = new ArrayList<Contour>();
-  
-  //size(opencv.width + opencv.width/4 + 30, opencv.height, P2D);
-    size(820, 480, P2D);
 
-  
+  contours = new ArrayList<ArrayList>();
+
+  //size(opencv.width + opencv.width/4 + 30, opencv.height, P2D);
+  size(820, 480, P2D);
+
+
   // Array for detection colors
   colors = new int[maxColors];
   hues = new int[maxColors];
-  
+
   outputs = new PImage[maxColors];
 }
 
 void draw() {
-  
+
   background(150);
-  
+
   // CAPTURE
   if (source == CAPTURE && cam != null) {
     if (cam.available()) {
       cam.read();
     }
-    
+
     // <2> Load the new frame of our movie in to OpenCV
     opencv.loadImage(cam);
-      
-  // MOVIE
+
+    // MOVIE
   } else if (source == VIDEO && video != null) {
     if (video.available()) {
       video.read();
     }
-    
+
     // <2> Load the new frame of our movie in to OpenCV
     opencv.loadImage(video);
   }
-  
+
   // Tell OpenCV to use color information
   opencv.useColor();
   src = opencv.getSnapshot();
-  
+
   // <3> Tell OpenCV to work in HSV color space.
   opencv.useColor(HSB);
-  
+
   detectColors();
-  
+
   // Show images
   image(src, 0, 0);
   for (int i=0; i<outputs.length; i++) {
     if (outputs[i] != null) {
       image(outputs[i], width-src.width/4, i*src.height/4, src.width/4, src.height/4);
-      
+
       noStroke();
       fill(colors[i]);
       rect(src.width, i*src.height/4, 30, src.height/4);
     }
   }
-  
+
   // Print text if new color expected
   textSize(16);
   stroke(255);
   fill(255);
-  
+
   if (colorToChange > -1) {
     text("click to change color " + colorToChange, 10, 25);
   } else {
     text("press key [1-4] to select color", 10, 25);
   }
-  
+
   text("press 'd' to reset all colors", 10, 50);
-  
-  displayContours(false);
+
+  displayContours(true);
 }
 
 //////////////////////
@@ -136,62 +138,69 @@ void draw() {
 //////////////////////
 
 void detectColors() {
-  
+
   // Clear old contours (no blob persistence)
   contours.clear();
-  
+
   for (int i=0; i<hues.length; i++) {
-    
+
     if (hues[i] <= 0) continue;
-    
+
     opencv.loadImage(src);
     opencv.useColor(HSB);
-    
+
     // <4> Copy the Hue channel of our image into 
     //     the gray channel, which we process.
     opencv.setGray(opencv.getH().clone());
-    
+
     int hueToDetect = hues[i];
     //println("index " + i + " - hue to detect: " + hueToDetect);
-    
+
     // <5> Filter the image based on the range of 
     //     hue values that match the object we want to track.
     opencv.inRange(hueToDetect-rangeWidth/2, hueToDetect+rangeWidth/2);
-    
+
     //opencv.dilate();
     opencv.erode();
-    
+
     // TO DO:
     // Add here some image filtering to detect blobs better
-    
+
     // <6> Save the processed image for reference.
     outputs[i] = opencv.getSnapshot();
-    
+
     // <7> Find contours in our range image.
     //     Passing 'true' sorts them by descending area.
-    contours.addAll(opencv.findContours(true,true));
+    //contours.addAll(opencv.findContours(true,true));
+    // <7> Find contours in our range image.
+    //     Passing 'true' sorts them by descending area.
+
+    opencv.loadImage(outputs[i]);
+    contours.add(opencv.findContours(true, true));
   }
 }
 
 void displayContours(Boolean showBoundingBoxes) {
-  
+
   for (int i=0; i<contours.size(); i++) {
-    
-    Contour contour = contours.get(i);
-    Rectangle r = contour.getBoundingBox();
-    
-    if (r.width < 20 || r.height < 20)
-      continue;
-    
-    stroke(0,255,0);
-    noFill();
-    contour.draw();
-    
-    if (showBoundingBoxes) {
-      strokeWeight(1);
-      stroke(255, 0, 0);
-      fill(255, 0, 0, 150);
-      rect(r.x, r.y, r.width, r.height);
+    ArrayList subContours = contours.get(i);
+    stroke(colors[i]);
+    fill(red(colors[i]), green(colors[i]), blue(colors[i]), 150);
+    strokeWeight(2);
+    for (int j=0; j<subContours.size(); j++) {
+
+      Contour contour = (Contour) subContours.get(j);
+      Rectangle r = contour.getBoundingBox();
+
+      if (r.width < 20 || r.height < 20)
+        continue;
+      if (showBoundingBoxes) {
+        strokeWeight(1);
+        rect(r.x, r.y, r.width, r.height);
+      } else {
+        noFill();
+        contour.draw();
+      }
     }
   }
 }
@@ -201,35 +210,31 @@ void displayContours(Boolean showBoundingBoxes) {
 //////////////////////
 
 void mousePressed() {
-    
+
   if (colorToChange > -1) {
-    
+
     color c = src.get(mouseX, mouseY); //get(mouseX, mouseY);
     println("r: " + red(c) + " g: " + green(c) + " b: " + blue(c));
-   
+
     int hue = int(map(hue(c), 0, 255, 0, 180));
-    
+
     colors[colorToChange-1] = c;
     hues[colorToChange-1] = hue;
-    
+
     println("color index " + (colorToChange-1) + ", value: " + hue);
   }
 }
 
 void keyPressed() {
-  
+
   if (key == '1') {
     colorToChange = 1;
-    
   } else if (key == '2') {
     colorToChange = 2;
-    
   } else if (key == '3') {
     colorToChange = 3;
-    
   } else if (key == '4') {
     colorToChange = 4;
-    
   } else if (key == 'r' || key == 'R') {
     colors = new int[maxColors];
     hues = new int[maxColors];
@@ -238,5 +243,5 @@ void keyPressed() {
 }
 
 void keyReleased() {
-  colorToChange = -1; 
+  colorToChange = -1;
 }
