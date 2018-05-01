@@ -60,7 +60,9 @@ void setup() {
   
   contours = new ArrayList<Contour>();
   
-  size(opencv.width + opencv.width/4 + 30, opencv.height, P2D);
+  //size(opencv.width + opencv.width/4 + 30, opencv.height, P2D);
+    size(820, 480, P2D);
+
   
   // Array for detection colors
   colors = new int[maxColors];
